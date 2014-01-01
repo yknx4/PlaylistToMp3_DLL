@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using System.ComponentModel;
 
 
 
@@ -14,12 +15,23 @@ namespace PlaylistToMp3_DLL
     /// Class for loading the .m3u8 playlist.
     /// </summary>
     /// 
-    
+
     public static class PlaylistLoader
     {
+        /// <summary>
+        /// Event Handler of Error Thrown
+        /// </summary>
+        /// <param name="e">The <see cref="PlaylistLoader.ErrorThrownEventArgs"/> instance containing the event data.</param>
         public delegate void ErrorThrownEventHandler(PlaylistLoader.ErrorThrownEventArgs e);
+        /// <summary>
+        /// Occurs when [error thrown].
+        /// </summary>
         public static event ErrorThrownEventHandler ErrorThrown;
-        public class ErrorThrownEventArgs : EventArgs{
+        /// <summary>
+        /// Error Thrown event args
+        /// </summary>
+        public class ErrorThrownEventArgs : EventArgs
+        {
             public String Error { get; set; }
         }
         static void OnErrorThrown(ErrorThrownEventArgs e)
@@ -28,6 +40,9 @@ namespace PlaylistToMp3_DLL
                 ErrorThrown(e);
         }
         public delegate void LogEventHandler(PlaylistLoader.LogEventArgs e);
+        /// <summary>
+        /// Occurs when [log].
+        /// </summary>
         public static event LogEventHandler Log;
         public class LogEventArgs : EventArgs
         {
@@ -38,7 +53,7 @@ namespace PlaylistToMp3_DLL
             if (Log != null)
                 Log(e);
         }
-        
+
         /// <summary>
         /// Loads the specified path.
         /// </summary>
@@ -56,43 +71,60 @@ namespace PlaylistToMp3_DLL
             }
             return result;
         }
+
+        /// <summary>
+        /// Loads the specified playlist.
+        /// </summary>
+        /// <param name="path">The playlist path.</param>
+        /// <returns></returns>
         public static List<TagLib.File> Load(string path)
         {
+
             var result = new List<TagLib.File>();
             try
             {
+                FileInfo pathInfo = new FileInfo(path);
                 foreach (string entry in System.IO.File.ReadAllLines(path))
                 {
+                    if (entry.Length == 0 || entry[0] == '#') continue;
                     string entry_f = entry;
                     if (entry[1] != ':')
                     {
                         entry_f = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), entry_f);
 
                     }
-                    FileInfo m_Entry = new FileInfo(Path.GetFullPath(entry_f));
-                    TagLib.File file = null;
-                    if (m_Entry.Exists)
+                    try
                     {
-                        try
+                        FileInfo m_Entry = new FileInfo(Path.GetFullPath(entry_f));
+                        TagLib.File file = null;
+                        if (m_Entry.Exists)
                         {
-                            file = TagLib.File.Create(m_Entry.FullName);
+                            file = loadFileTags(ref m_Entry);
+
+
                         }
-                        catch (TagLib.UnsupportedFormatException)
+                        else
                         {
-                            Console.WriteLine("UNSUPPORTED FILE: " + m_Entry.FullName);
-                            Console.WriteLine(String.Empty);
-                            Console.WriteLine("---------------------------------------");
-                            Console.WriteLine(String.Empty);
-                            OnLog(new LogEventArgs { Message = "UNSUPPORTED FILE: " + m_Entry.FullName });
-                            continue;
+                            string altPath = Path.Combine(pathInfo.Directory.FullName, entry);
+                            m_Entry = new FileInfo(Path.GetFullPath(altPath));
+                            if (m_Entry.Exists)
+                                file = loadFileTags(ref m_Entry);
+                            else
+                            {
+                                OnLog(new LogEventArgs { Message = m_Entry.FullName + " doesn't exist." });
+                                continue;
+                            }
+                            /*throw new ArgumentException(m_Entry.FullName);*/
                         }
-                        result.Add(file);
+                        if (file != null)
+                            result.Add(file);
                     }
-                    else
+                    catch (Exception e)
                     {
-                        OnLog(new LogEventArgs{Message=m_Entry.FullName+" doesn't exist."});
-                        /*throw new ArgumentException(m_Entry.FullName);*/
+                        OnLog(new LogEventArgs { Message = entry_f + " cannot be loaded." });
+                        OnErrorThrown(new ErrorThrownEventArgs { Error = e.ToString() });
                     }
+
 
 
                 }
@@ -101,11 +133,29 @@ namespace PlaylistToMp3_DLL
             catch (Exception ex)
             {
                 OnErrorThrown(new ErrorThrownEventArgs { Error = ex.ToString() });
-                
+
                 //throw ex;
             }
 
             return result;
+        }
+
+        private static TagLib.File loadFileTags(ref FileInfo m_Entry)
+        {
+            TagLib.File res = null;
+            try
+            {
+                res = TagLib.File.Create(m_Entry.FullName);
+            }
+            catch (TagLib.UnsupportedFormatException)
+            {
+                res = null;
+                Console.WriteLine("UNSUPPORTED FILE: " + m_Entry.FullName);
+                Console.WriteLine(String.Empty);
+                Console.WriteLine("---------------------------------------");
+                Console.WriteLine(String.Empty);
+                OnLog(new LogEventArgs { Message = "UNSUPPORTED FILE: " + m_Entry.FullName });
+            } return res;
         }
     }
 }
