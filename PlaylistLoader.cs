@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using TagLib;
+
 
 
 
@@ -13,16 +13,32 @@ namespace PlaylistToMp3_DLL
     /// <summary>
     /// Class for loading the .m3u8 playlist.
     /// </summary>
-public static class PlaylistLoader
+    /// 
+    
+    public static class PlaylistLoader
     {
-        private static string _error;
-        /// <summary>
-        /// Gets the error.
-        /// </summary>
-        /// <value>
-        /// The error.
-        /// </value>
-        public static String Error { get { return _error != null ? _error : ""; } }
+        public delegate void ErrorThrownEventHandler(PlaylistLoader.ErrorThrownEventArgs e);
+        public static event ErrorThrownEventHandler ErrorThrown;
+        public class ErrorThrownEventArgs : EventArgs{
+            public String Error { get; set; }
+        }
+        static void OnErrorThrown(ErrorThrownEventArgs e)
+        {
+            if (ErrorThrown != null)
+                ErrorThrown(e);
+        }
+        public delegate void LogEventHandler(PlaylistLoader.LogEventArgs e);
+        public static event LogEventHandler Log;
+        public class LogEventArgs : EventArgs
+        {
+            public String Message { get; set; }
+        }
+        static void OnLog(LogEventArgs e)
+        {
+            if (Log != null)
+                Log(e);
+        }
+        
         /// <summary>
         /// Loads the specified path.
         /// </summary>
@@ -40,9 +56,9 @@ public static class PlaylistLoader
             }
             return result;
         }
-        public static List< TagLib.File> Load(string path)
+        public static List<TagLib.File> Load(string path)
         {
-            var result = new List< TagLib.File>();
+            var result = new List<TagLib.File>();
             try
             {
                 foreach (string entry in System.IO.File.ReadAllLines(path))
@@ -50,8 +66,8 @@ public static class PlaylistLoader
                     string entry_f = entry;
                     if (entry[1] != ':')
                     {
-                        entry_f = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) , entry_f);
-                        
+                        entry_f = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), entry_f);
+
                     }
                     FileInfo m_Entry = new FileInfo(Path.GetFullPath(entry_f));
                     TagLib.File file = null;
@@ -67,22 +83,25 @@ public static class PlaylistLoader
                             Console.WriteLine(String.Empty);
                             Console.WriteLine("---------------------------------------");
                             Console.WriteLine(String.Empty);
+                            OnLog(new LogEventArgs { Message = "UNSUPPORTED FILE: " + m_Entry.FullName });
                             continue;
                         }
                         result.Add(file);
                     }
                     else
                     {
-                        throw new ArgumentException(m_Entry.FullName);
+                        OnLog(new LogEventArgs{Message=m_Entry.FullName+" doesn't exist."});
+                        /*throw new ArgumentException(m_Entry.FullName);*/
                     }
 
 
                 }
             }
 
-            catch (SystemException ex)
+            catch (Exception ex)
             {
-                _error = ex.ToString();
+                OnErrorThrown(new ErrorThrownEventArgs { Error = ex.ToString() });
+                
                 //throw ex;
             }
 
