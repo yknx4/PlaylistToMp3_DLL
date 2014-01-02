@@ -8,6 +8,20 @@ namespace PlaylistToMp3_DLL
     public delegate void ConvertedEventHandler(object sender, EventArgs e);
     public class MusicFile
     {
+
+        /// <summary>
+        /// Compares the bit rate.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="minBitrate">The minimum bitrate.</param>
+        /// <returns>True if input bitrate is lower than minimum bitrate, false otherwise</returns>
+        public static bool CompareBitRate(MusicFile input, int minBitrate){
+            //var entrada = TagLib.File.Create(input.FileName);
+
+            return input.Bitrate < minBitrate ? true : false;
+        
+        }
+
         private TagLib.File _file;
 
         public event ConvertedEventHandler Converted;
